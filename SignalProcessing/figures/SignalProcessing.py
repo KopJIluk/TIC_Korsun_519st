@@ -1,149 +1,94 @@
-import os
 import numpy as np
-from scipy import signal, fft
 import matplotlib.pyplot as plt
 
-# Вихідні параметри
-n = 500  # Довжина сигналу у відліках
-Fs = 1000  # Частота дискретизації (Гц)
-F_max = 19  # Максимальна частота сигналу (Гц)
+# Параметри сигналу
+n = 500
+Fs = 1000
+Fmax = 19
 
-# Генерація сигналу
-signal_values = np.random.normal(0, F_max, n)
+# Генерація випадкового сигналу з частотою Fmax
+t = np.arange(0, n / Fs, 1 / Fs)
+signal = np.sin(2 * np.pi * Fmax * t) + 0.5 * np.random.randn(n)
 
-# Визначення відліків часу
-time_values = np.arange(n) / Fs
-
-# Розрахунок параметрів фільтру
-w = F_max / (Fs / 2)
-b, a = signal.butter(3, w, 'low')
-
-# Фільтрація сигналу
-filtered_signal = signal.filtfilt(b, a, signal_values)
-
-# Розрахунок спектру сигналу
-spectrum = fft.fft(filtered_signal)
-spectrum_abs = np.abs(fft.fftshift(spectrum))
-freqs = fft.fftfreq(n, 1/Fs)
-freqs_shifted = fft.fftshift(freqs)
-
-# Створення директорії для збереження файлів, якщо вона ще не існує
-save_dir = 'figures'
-os.makedirs(save_dir, exist_ok=True)
-
-# Відображення результатів
-plt.figure(figsize=(8.27, 5.83))
-plt.plot(time_values, filtered_signal)
-plt.title('Згенерований сигнал')
-plt.xlabel('Час (с)')
-plt.ylabel('Значення сигналу')
-plt.grid(True)
-plt.savefig(os.path.join(save_dir, 'generated_signal.png'))
-plt.show()
-
-plt.figure(figsize=(8.27, 5.83))
-plt.plot(freqs_shifted, spectrum_abs)
-plt.title('Спектр сигналу')
-plt.xlabel('Частота (Гц)')
-plt.ylabel('Модуль спектру')
-plt.grid(True)
-plt.savefig(os.path.join(save_dir, 'signal_spectrum.png'))
-plt.show()
-
-# Дискретизація сигналу з різними кроками
-steps = [2, 4, 8, 16]
-discrete_signals = []
-discrete_spectrums = []
-restored_signals = []
+# Збереження результатів
+quantized_signals = []
 variances = []
 snr_values = []
 
-for Dt in steps:
-    discrete_signal = np.zeros(n)
-    for i in range(0, round(n/Dt)):
-        discrete_signal[i * Dt] = filtered_signal[i * Dt]
-    discrete_signals.append(discrete_signal)
+# Квантування сигналу на різні рівні
+for M in [4, 16, 64, 256]:
+    delta = (np.max(signal) - np.min(signal)) / (M - 1)
+    quantized_signal = delta * np.round(signal / delta)
+    quantized_signals.append(quantized_signal)
 
-    # Розрахунок спектру дискретизованого сигналу
-    spectrum = fft.fft(discrete_signal)
-    spectrum_abs = np.abs(fft.fftshift(spectrum))
-    discrete_spectrums.append(spectrum_abs)
+    # Розрахунок рівнів квантування
+    quantize_levels = np.arange(np.min(quantized_signal), np.max(quantized_signal) + delta, delta)
 
-    # Відновлення сигналу
-    w = F_max / (Fs / 2)
-    sos = signal.butter(3, w, 'low', output='sos')
-    restored_signal = signal.sosfiltfilt(sos, discrete_signal)
-    restored_signals.append(restored_signal)
+    # Генерація бітів
+    quantize_bits = np.arange(0, M)
+    quantize_bits = [format(bits, '0' + str(int(np.log2(M))) + 'b') for bits in quantize_bits]
 
-    # Розрахунок дисперсії та співвідношення сигнал-шум
-    E1 = restored_signal - filtered_signal
-    var_original = np.var(filtered_signal)
-    var_difference = np.var(E1)
-    snr = var_original / var_difference
-    variances.append(var_difference)
+    # Таблиця квантування
+    quantize_table = np.c_[quantize_levels[:M], quantize_bits[:M]]
+
+    # Відображення таблиці
+    fig, ax = plt.subplots(figsize=(14 / 2.54, M / 2.54))
+    table = ax.table(cellText=quantize_table, colLabels=['Значення сигналу', 'Кодова послідовність'], loc='center')
+    table.set_fontsize(14)
+    table.scale(1, 2)
+    ax.axis('off')
+    fig.savefig(f'figures/quantization_table_M{M}.png', dpi=600)
+
+    # Кодування сигналу
+    bits = []
+    for signal_value in quantized_signal:
+        for index, value in enumerate(quantize_levels[:M]):
+            if np.round(np.abs(signal_value - value), 0) == 0:
+                bits.append(quantize_bits[index])
+                break
+
+    bits = [int(bit) for bit in ''.join(bits)]
+
+    # Відображення бітової послідовності
+    fig, ax = plt.subplots(figsize=(21 / 2.54, 14 / 2.54))
+    ax.step(np.arange(len(bits)), bits, linewidth=0.1)
+    ax.set_xlabel('Відліки')
+    ax.set_ylabel('Бітова послідовність')
+    ax.set_title(f'Кодова послідовність для M={M}')
+    fig.savefig(f'figures/bit_sequence_M{M}.png', dpi=600)
+
+    # Розрахунок дисперсії та співвідношення сигнал/шум
+    quantization_noise = quantized_signal - signal
+    variance = np.var(quantization_noise)
+    signal_power = np.mean(signal ** 2)
+    snr = 10 * np.log10(signal_power / variance)
+
+    variances.append(variance)
     snr_values.append(snr)
 
-# Відображення дискретизованих сигналів
-fig, ax = plt.subplots(2, 2, figsize=(21/2.54, 14/2.54))
-fig.suptitle('Дискретизовані сигнали', fontsize=14)
+# Побудова графіків
+fig, ax = plt.subplots(figsize=(14 / 2.54, 10 / 2.54))
+for idx, M in enumerate([4, 16, 64, 256]):
+    ax.plot(t, quantized_signals[idx], label=f'Квантування на {M} рівнів')
+ax.plot(t, signal, 'k--', label='Оригінальний сигнал')
+ax.set_xlabel('Час (с)')
+ax.set_ylabel('Амплітуда')
+ax.set_title('Цифрові сигнали з різними рівнями квантування')
+ax.legend()
+fig.savefig('figures/quantized_signals.png', dpi=600)
 
-s = 0
-for i in range(2):
-    for j in range(2):
-        ax[i][j].plot(time_values, discrete_signals[s], linewidth=1)
-        s += 1
+fig, ax = plt.subplots(figsize=(14 / 2.54, 10 / 2.54))
+ax.plot([4, 16, 64, 256], variances, 'o-')
+ax.set_xlabel('Кількість рівнів квантування')
+ax.set_ylabel('Дисперсія')
+ax.set_title('Залежність дисперсії від кількості рівнів квантування')
+fig.savefig('figures/variance_vs_quantization_levels.png', dpi=600)
 
-fig.supxlabel('Час (с)', fontsize=14)
-fig.supylabel('Значення сигналу', fontsize=14)
-plt.savefig(os.path.join(save_dir, 'discrete_signals.png'))
-plt.show()
+fig, ax = plt.subplots(figsize=(14 / 2.54, 10 / 2.54))
+ax.plot([4, 16, 64, 256], snr_values, 'o-')
+ax.set_xlabel('Кількість рівнів квантування')
+ax.set_ylabel('Співвідношення сигнал/шум (дБ)')
+ax.set_title('Залежність співвідношення сигнал/шум від кількості рівнів квантування')
+fig.savefig('figures/snr_vs_quantization_levels.png', dpi=600)
 
-# Відображення спектрів дискретизованих сигналів
-fig, ax = plt.subplots(2, 2, figsize=(21/2.54, 14/2.54))
-fig.suptitle('Спектри дискретизованих сигналів', fontsize=14)
-
-s = 0
-for i in range(2):
-    for j in range(2):
-        ax[i][j].plot(freqs_shifted, discrete_spectrums[s], linewidth=1)
-        s += 1
-
-fig.supxlabel('Частота (Гц)', fontsize=14)
-fig.supylabel('Модуль спектру', fontsize=14)
-plt.savefig(os.path.join(save_dir, 'discrete_spectrums.png'))
-plt.show()
-
-# Відображення відновлених сигналів
-fig, ax = plt.subplots(2, 2, figsize=(21/2.54, 14/2.54))
-fig.suptitle('Відновлені сигнали', fontsize=14)
-
-s = 0
-for i in range(2):
-    for j in range(2):
-        ax[i][j].plot(time_values, restored_signals[s], linewidth=1)
-        s += 1
-
-fig.supxlabel('Час (с)', fontsize=14)
-fig.supylabel('Значення сигналу', fontsize=14)
-plt.savefig(os.path.join(save_dir, 'restored_signals.png'))
-plt.show()
-
-# Відображення залежності дисперсії різниці від кроку дискретизації
-plt.figure(figsize=(8.27, 5.83))
-plt.plot(steps, variances, marker='o')
-plt.title('Залежність дисперсії різниці від кроку дискретизації')
-plt.xlabel('Крок дискретизації')
-plt.ylabel('Дисперсія різниці')
-plt.grid(True)
-plt.savefig(os.path.join(save_dir, 'variance_vs_step.png'))
-plt.show()
-
-# Відображення співвідношення сигнал-шум від кроку дискретизації
-plt.figure(figsize=(8.27, 5.83))
-plt.plot(steps, snr_values, marker='o')
-plt.title('Залежність співвідношення сигнал-шум від кроку дискретизації')
-plt.xlabel('Крок дискретизації')
-plt.ylabel('Співвідношення сигнал-шум')
-plt.grid(True)
-plt.savefig(os.path.join(save_dir, 'snr_vs_step.png'))
 plt.show()
