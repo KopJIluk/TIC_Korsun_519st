@@ -1,0 +1,24 @@
+Sequence: AAAABBBCCDAA
+Encoded RLE: [('A', 4), ('B', 3), ('C', 2), ('D', 1), ('A', 2)]
+Decoded RLE: AAAABBBCCDAA
+Encoded LZW: [65, 65536, 65, 66, 65539, 67, 67, 68, 65536]
+Decoded LZW: A𐀀ABBBCCD𐀀A
+
+Sequence: HELLOHELLOHELLO
+Encoded RLE: [('H', 1), ('E', 1), ('L', 2), ('O', 1), ('H', 1), ('E', 1), ('L', 2), ('O', 1), ('H', 1), ('E', 1), ('L', 2), ('O', 1)]
+Decoded RLE: HELLOHELLOHELLO
+Encoded LZW: [72, 69, 76, 76, 79, 65536, 65538, 65540, 65537, 65539]
+Decoded LZW: HELLO𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀
+
+Sequence: ABABABABABABAB
+Encoded RLE: [('A', 1), ('B', 1), ('A', 1), ('B', 1), ('A', 1), ('B', 1), ('A', 1), ('B', 1), ('A', 1), ('B', 1), ('A', 1), ('B', 1), ('A', 1), ('B', 1)]
+Decoded RLE: ABABABABABABAB
+Encoded LZW: [65, 66, 65536, 65538, 65537, 65540, 65536]
+Decoded LZW: AB𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀𐀀
+
+Sequence: 112233445566778899
+Encoded RLE: [('1', 2), ('2', 2), ('3', 2), ('4', 2), ('5', 2), ('6', 2), ('7', 2), ('8', 2), ('9', 2)]
+Decoded RLE: 112233445566778899
+Encoded LZW: [49, 49, 50, 50, 51, 51, 52, 52, 53, 53, 54, 54, 55, 55, 56, 56, 57, 57]
+Decoded LZW: 112233445566778899
+
